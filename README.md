@@ -37,4 +37,4 @@ git push -u origin master
 chown -R 1000:1000 .
 ```
 - Add SSH private key to Jenkins credential store
-- Create a new Pipeline job with the Pipeline configuration as follows
+- Create a new Pipeline job with the Pipeline configuration from [here](jenkins/pipeline/jenkinsBackup/Jenkinsfile)
