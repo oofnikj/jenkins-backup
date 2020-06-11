@@ -1,0 +1,58 @@
+// jenkins/pipeline/jenkinsBackup/Jenkinsfile
+pipeline {
+  options { timestamps() }
+  triggers { cron 'H H * * *' } // run at some random minute once a day
+  agent {
+    dockerfile {
+      dir 'jenkins/pipeline/docker/git/'
+      args '-v /var/jenkins_home:/var/jenkins_home'
+    }
+  }
+  parameters {
+    string(name: 'remote_branch', defaultValue: 'master')
+  }
+  stages {
+    stage('plugins') {
+      steps {
+        script {
+          def pluginList = []
+          Jenkins.instance.pluginManager.plugins.each {
+            plugin -> 
+              pluginList.add("${plugin.getShortName()}:${plugin.getVersion()}")
+          }
+          writeFile file: '/var/jenkins_home/plugins.txt', text: pluginList.sort().join('\n')
+        }
+      }
+    }
+
+    stage('add files') {
+      steps {
+        sh """
+          cd /var/jenkins_home
+          find . -name "config.xml" | egrep -v "(branches|workspace|users)" | xargs git add
+          git add plugins.txt
+          git add scriptApproval.xml
+          git commit -m "automatic config sync" || true
+        """
+      }
+    }
+
+    stage('push') {
+      steps {
+        sshagent(['jenkins-backup-git']) {
+          sh """
+          cd /var/jenkins_home
+          git pull origin ${params.remote_branch}
+          git push -u origin ${params.remote_branch}
+          """
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      cleanWs()
+    }
+  }
+}
